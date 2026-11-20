@@ -25,6 +25,12 @@ debug-assertions = true
 inherits = "release"
 debug = true
 
+[profile.test]
+# Keep unit tests fast (issue #980: tests must run in under 30 seconds).
+opt-level = 0
+debug = true
+incremental = true
+
 [workspace.metadata]
 homepage = "https://github.com/kenedybok3/SAFE-HAVEN"
 repository = "https://github.com/kenedybok3/SAFE-HAVEN"

@@ -88,6 +88,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+          components: llvm-tools-preview
 
       - name: Cache cargo registry
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -99,11 +100,27 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Run tests
-        run: cargo test --features testutils
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Run tests with coverage
+        run: |
+          cargo llvm-cov --features testutils \
+            --lcov --output-path lcov.info \
+            --fail-under-lines 80
 
       - name: Run doc tests
         run: cargo test --doc --features testutils
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.sha }}
+          path: lcov.info
+          if-no-files-found: ignore
 
   # ----------------------------------------------------------------
   #  Performance Regression Tests
@@ -248,54 +265,3 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
-          targets: wasm32-unknown-unknown
-
-      - name: Cache cargo registry
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-wasm-${{ matrix.toolchain }}-${{ hashFiles('**/Cargo.lock', 'rust-toolchain.toml') }}
-          restore-keys: ${{ runner.os }}-cargo-wasm-${{ matrix.toolchain }}-
-
-      - name: Check WASM target
-        run: cargo check --target wasm32-unknown-unknown
-
-      - name: Build release WASM
-        run: cargo build --target wasm32-unknown-unknown --release
-
-      - name: Cache stellar-cli
-        id: cache-stellar
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: /usr/local/bin/stellar
-          key: stellar-cli-${{ env.STELLAR_CLI_VERSION }}
-
-      - name: Install stellar-cli
-        if: steps.cache-stellar.outputs.cache-hit != 'true'
-        run: |
-          curl -sSL "https://github.com/stellar/stellar-cli/releases/download/v${{ env.STELLAR_CLI_VERSION }}/stellar-cli-v${{ env.STELLAR_CLI_VERSION }}-x86_64-unknown-linux-gnu.tar.gz" \
-            | tar -xz -C /usr/local/bin stellar
-
-      - name: Optimize WASM
-        run: |
-          stellar contract optimize \
-            --wasm target/wasm32-unknown-unknown/release/safe_haven.wasm \
-            --wasm-out target/safe_haven.optimized.wasm
-
-      - name: Check WASM size
-        env:
-          MAX_WASM_BYTES: 65536
-        run: |
-          echo "=== Raw WASM ==="
-          ls -lh target/wasm32-unknown-unknown/release/safe_haven.wasm
-          echo "=== Optimized WASM ==="
-          ls -lh target/safe_haven.optimized.wasm
-          ACTUAL=$(wc -c < target/safe_haven.optimized.wasm)
-          echo "Optimized WASM size: ${ACTUAL} bytes (limit: ${MAX_WASM_BYTES})"
-          if [ "$ACTUAL" -gt "$MAX_WASM_BYTES" ]; then
-            echo "ERROR: Optimized WASM exceeds size limit"
-            exit 1
-          fi

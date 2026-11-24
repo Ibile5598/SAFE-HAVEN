@@ -7,9 +7,7 @@ use soroban_sdk::{Address, Env, String, Vec};
 use crate::constants::MAX_LOCK_DURATION_SECS;
 use crate::prediction_market_types::{
     Bet, MarketConfig, MarketOutcome, OracleResolution, PredictionMarket,
-    PredictionMarket, MarketOutcome, Bet, BetKey, MarketConfig, OracleResolution,
 };
-use crate::types::MAX_LOCK_DURATION_SECS;
 
 // Storage key types for prediction markets
 #[derive(Clone)]
@@ -162,6 +160,11 @@ pub fn remove_bet(env: &Env, market_id: u32, outcome_id: u32, bettor: &Address) 
     env.storage().persistent().remove(&key);
 }
 
+/// Pure read of a bet keyed by (market_id, outcome_id, bettor).
+///
+/// Performs no TTL extension and no writes, so it is safe to use from
+/// read-only query entry points such as `get_user_bet`. The stored `Bet`
+/// carries the amount, outcome_id, timestamp and claimed status.
 pub fn get_bet_readonly(env: &Env, market_id: u32, outcome_id: u32, bettor: &Address) -> Option<Bet> {
     let key = soroban_sdk::Symbol::new(
         env,

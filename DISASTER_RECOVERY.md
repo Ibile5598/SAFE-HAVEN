@@ -136,6 +136,92 @@ See [Scenario B: Data Corruption or State Mismatch](#scenario-b-data-corruption-
 
 ### Triage
 
+1. Treat an indexer or frontend mismatch as a data incident, not a contract incident, until ledger evidence proves otherwise. Do not pause the contract solely because a dashboard disagrees with the chain.
+2. Compare the same deposit and token across at least two independent RPC providers, a block explorer, and the application index. Record the ledger sequence used for each observation.
+3. Identify the earliest ledger where the observations diverge and the last ledger where they agree.
+4. Preserve raw RPC responses, indexer query output, application logs, and the deployed frontend build hash.
+
+### Recovery
+
+1. If the contract state is correct and only the index is wrong, rebuild the index from the last agreed ledger. Do not submit on-chain transactions to fix an off-chain view.
+2. If the contract state is wrong, escalate to Scenario A and follow its containment and recovery steps.
+3. Reconcile every affected deposit against on-chain state before restoring user-facing balances or statuses.
+4. Verify the rebuilt index against a second RPC provider before re-enabling deposits or withdrawals in the frontend.
+
+### Exit criteria
+
+- The index and contract state agree at a recorded ledger.
+- The root cause is documented with an owner and a follow-up fix.
+- Users see accurate balances and statuses.
+
+## Scenario C: Admin Key Compromise
+
+1. Set severity to SEV-1 and pause the contract if the compromised signer still has authority.
+2. If the admin is not yet compromised but a pending admin is suspect, cancel or complete the two-step transfer only with security-lead approval and a reviewed transaction.
+3. Rotate the admin signer to a new, independently held key using the two-step transfer. Verify `get_admin()` and `get_pending_admin()` after each step.
+4. Treat all transactions signed by the compromised key after the suspected compromise ledger as unauthorized until proven otherwise.
+5. Follow Scenario A for any resulting fund movement and user remediation.
+
+## Scenario D: RPC or Infrastructure Outage
+
+1. Confirm the outage is external by checking multiple RPC providers and the network status page.
+2. Keep the contract state unchanged. Do not pause for a read-only outage unless withdrawals are failing in a way that risks funds.
+3. Switch the frontend and indexer to a healthy RPC provider and record the change.
+4. Communicate degraded service to users and restore normal operation once providers recover.
+
+## Backup and Recovery of Operational Data
+
+On-chain state is authoritative and does not require backups. Operational data that must be backed up includes the application index/database, deployment configuration, and incident evidence.
+
+### Automated daily backups
+
+- A scheduled job runs daily and produces an encrypted database dump plus the current deployment configuration.
+- Backups are written to durable, access-controlled storage separate from the primary database host.
+- Each backup records a UTC timestamp, checksum, size, and the source database version.
+- Backups are encrypted at rest and in transit; encryption keys are stored separately from the backup data.
+
+### Retention policy
+
+| Tier | Retention | Purpose |
+|---|---|---|
+| Daily | 30 days | Routine recovery and short-term rollback. |
+| Weekly | 12 weeks | Medium-term recovery and trend analysis. |
+| Monthly | 12 months | Compliance and audit evidence. |
+
+Retention meets the compliance requirement of at least 12 months of monthly backups. Expired backups are deleted automatically by the retention job; deletion is logged.
+
+### Backup monitoring and alerts
+
+- The backup job emits a success or failure signal on completion.
+- An alert fires if a daily backup does not complete successfully within its scheduled window, if the backup checksum fails verification, or if no successful backup exists in the last 26 hours.
+- Alerts route to the on-call engineer and the data/reconciliation owner.
+- A failed backup is treated as a SEV-2 data incident until a verified backup exists.
+
+### Restoration procedure
+
+1. Select the most recent backup that passes checksum verification.
+2. Restore into an isolated environment, never directly over production.
+3. Verify row counts, key tables, and a sample of deposits against on-chain state at the backup’s recorded ledger.
+4. Record the restore start and end time; restoration must complete in under 1 hour.
+5. Promote the restored database only after reconciliation sign-off.
+
+### Monthly restoration test
+
+- On the first business day of each month, restore the latest monthly backup into an isolated environment and run the verification steps above.
+- Record the test date, operator, backup used, restore duration, and verification result in the incident log.
+- A failed or overdue restoration test is a SEV-2 data incident and must be resolved before the next monthly cycle.
+
+## Communications
+
+- Use approved channels only. Do not speculate about cause, impact, or timelines before the security lead confirms them.
+- Provide users with the contract ID, affected functions, and the exact recovery steps they must take themselves.
+- Never request secret keys, seed phrases, or signed transactions from users.
+
+## Post-Incident Review
+
+1. Hold a blameless review within five business days of closure.
+2. Document the timeline, root cause, impact, detection gaps, and follow-up actions with owners and due dates.
+3. Update this runbook, [MONITORING.md](MONITORING.md), and tests based on lessons learned.
 1. Treat an indexer or fronte
 
 /* … truncated 6667 chars — edit only what you need near the top … */

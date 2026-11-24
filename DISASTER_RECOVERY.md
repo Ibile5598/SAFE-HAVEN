@@ -34,10 +34,32 @@ For a small team, one person may hold multiple roles, but the incident commander
 | SEV-1 | Active or likely fund loss, private admin key compromise, or contract-wide integrity failure. | Pause immediately; page security lead and incident commander. | Every 30 minutes until contained. |
 | SEV-2 | Contract vulnerability with no confirmed loss, repeated failed withdrawals, or material data inconsistency. | Restrict deposits, preserve evidence, and start reconciliation. | Every 2 hours. |
 | SEV-3 | Isolated UI, RPC, indexer, or documentation issue with no evidence of incorrect on-chain state. | Route to the owning engineer and monitor. | Daily until resolved. |
+| SEV-4 | Cosmetic or informational issue with no user or fund impact (typos, stale docs, non-blocking warnings). | Log and schedule in normal backlog. | Weekly until resolved. |
 
 Escalate immediately to SEV-1 when any of the following is observed: an unauthorized admin transaction, a token balance decrease not explained by a valid withdrawal, a compromised signer, or evidence that users cannot recover funds through the documented contract paths. Notify the security contact in [SECURITY.md](SECURITY.md) privately; replace its placeholder address before production use.
 
 The incident commander may declare containment only after the security lead confirms that no new unauthorized state changes are occurring and the data owner records the last verified ledger. Public disclosure, user remediation, and unpausing require security and incident-commander approval.
+
+### Escalation chain
+
+1. **On-call engineer** — first responder; triages, assigns an initial severity, and opens the incident channel.
+2. **Incident commander** — paged for SEV-1/SEV-2; owns the timeline and decisions.
+3. **Security lead** — paged for SEV-1 and any suspected exploit; owns containment and disclosure.
+4. **Contract operator / transaction approver** — paged for SEV-1; executes reviewed state changes.
+5. **Engineering lead / maintainers** — engaged when a replacement deployment or cross-team coordination is required.
+6. **Communications owner** — engaged for any user-facing impact.
+
+If a role does not acknowledge within 15 minutes, escalate to the next role in the chain and record the escalation in the incident timeline.
+
+## Incident Response Workflow
+
+Every incident follows the same five phases. Record UTC timestamps for each transition in the incident timeline.
+
+1. **Detect** — an alert, user report, or operator observation opens the incident. Capture symptoms, contract ID, network, and suspected first affected ledger.
+2. **Triage** — assign severity using the table above, page the required roles, and open the private incident channel. Target: severity assigned within 15 minutes of detection.
+3. **Mitigate** — contain the impact (pause, restrict deposits, freeze deployments) and preserve evidence. Do not attempt unreviewed fixes against production state.
+4. **Resolve** — apply the remediation from the matching runbook, verify on-chain state, and confirm the impact is closed.
+5. **Follow-up** — record the final timeline, confirm exit criteria, and hand off any open items to their owners. Post-mortems are tracked separately and are out of scope for this runbook.
 
 ## Common First Response
 
@@ -48,6 +70,39 @@ The incident commander may declare containment only after the security lead conf
 5. Confirm the current admin, pending admin, paused state, contract initialization state, and contract/token balances from more than one trusted RPC or explorer when possible.
 6. Require a second operator to review every recovery transaction’s destination, amount, contract ID, network passphrase, and simulation result.
 7. Keep a transaction ledger containing: UTC time, operator, reviewer, function, depositor, deposit ID, token, amount, transaction hash, result, and evidence link.
+
+## Runbooks for Top 5 Incidents
+
+Each runbook below is a condensed procedure. Follow the Common First Response first, then the matching runbook.
+
+### Runbook 1: Active exploit or contract vulnerability
+
+See [Scenario A: Contract Vulnerability or Active Exploit](#scenario-a-contract-vulnerability-or-active-exploit). Pause the contract, preserve evidence, build and deploy a reviewed replacement, and migrate users through supported contract calls.
+
+### Runbook 2: Compromised admin signer
+
+1. Set SEV-1 and page the security lead and incident commander.
+2. If a safe signer remains, call `pause(admin)` and verify `is_paused() == true` from the network.
+3. Begin a two-step admin transfer to a freshly generated, hardware-backed signer; require a second operator to review the pending-admin transaction.
+4. Do not sign recovery transactions from the compromised key. Reconcile balances and follow Runbook 1 for remediation.
+
+### Runbook 3: Data corruption or state mismatch
+
+See [Scenario B: Data Corruption or State Mismatch](#scenario-b-data-corruption-or-state-mismatch). Treat ledger history as authoritative; reconcile indexer, RPC, and application views against on-chain events before changing state.
+
+### Runbook 4: Failed or stuck withdrawals
+
+1. Set SEV-2 unless fund loss is confirmed.
+2. Reproduce the failure with a read-only simulation; capture the error, deposit ID, token, and amount.
+3. Verify the deposit exists, the contract is not paused, and the token balance covers the withdrawal.
+4. If the contract is paused, follow the unpause approval path; otherwise escalate to the security lead for a contract-level defect.
+
+### Runbook 5: RPC, indexer, or frontend outage
+
+1. Set SEV-3 unless on-chain state is affected.
+2. Confirm the contract is reachable through an alternate trusted RPC or explorer.
+3. Fail over the frontend/RPC configuration and verify read-only queries succeed.
+4. If on-chain state appears inconsistent, escalate to Runbook 3.
 
 ## Scenario A: Contract Vulnerability or Active Exploit
 
@@ -167,3 +222,6 @@ Retention meets the compliance requirement of at least 12 months of monthly back
 1. Hold a blameless review within five business days of closure.
 2. Document the timeline, root cause, impact, detection gaps, and follow-up actions with owners and due dates.
 3. Update this runbook, [MONITORING.md](MONITORING.md), and tests based on lessons learned.
+1. Treat an indexer or fronte
+
+/* … truncated 6667 chars — edit only what you need near the top … */

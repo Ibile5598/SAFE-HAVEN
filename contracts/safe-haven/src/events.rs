@@ -360,3 +360,10 @@ pub fn rewards_claimed(env: &Env, staker: &Address, amount: i128) {
     env.events()
         .publish(topics, (amount, env.ledger().timestamp()));
 }
+
+/// Emitted when a depositor achieves a sustainability milestone
+/// (carbon_neutral, high_renewable, carbon_negative, or large_offset).
+pub fn sustainability_milestone(env: &Env, depositor: &Address, milestone_type: &str) {
+    let topics = (Symbol::new(env, "sustainability"), depositor.clone());
+    env.events().publish(topics, Symbol::new(env, milestone_type));
+}
